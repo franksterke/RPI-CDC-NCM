@@ -1,8 +1,20 @@
 # USB CDC-NCM Networking Architecture
 
-Status: design proposal. This document deliberately separates facts established by published specifications and kernel documentation from behavior that must be verified with real USB gadget hardware and a Windows host.
+Status: target architecture with an initial installer implementation. See the repository README for current commands and limitations, and `quadra-003-validation.md` for the first hardware results. This document separates facts established by published specifications and kernel documentation from behavior that must be verified with real USB gadget hardware and a Windows host.
 
 ## Scope
+
+The deliverable is a reusable device-side installer, not a website or application.
+Website hosting, browser-supplied clock synchronization, host internet sharing,
+and application firewall policy remain outside this repository's installation scope.
+The initial installer supports explicit `rpi-zero` boot configuration and a
+`generic` profile for boards whose vendor setup already exposes one UDC. It does
+not claim automatic boot configuration for unspecified Radxa models.
+
+The current implementation in `tools/install.py` uses CLI network/board options
+and a persistent JSON identity file. The YAML contract below is a future target,
+not a currently accepted installer input. Production USB identity configuration,
+additional board profiles and Linux/macOS host qualification remain pending.
 
 This repository will provide a reusable Linux device-side USB networking component. It will compose a USB gadget with ConfigFS/libcomposite and the kernel CDC-NCM function, configure the resulting Linux network link, integrate with systemd, and provide diagnostics. It will not contain product identity, board-specific paths, or Windows kernel drivers.
 

@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^if \\(-not \\(Test-Path 'docs/architecture\\.md'\\)\\) \\{ throw 'architecture document missing' \\}; git check-ignore -v --no-index docs/architecture\\.md; if \\(\\$LASTEXITCODE -ne 0\\) \\{ 'architecture\\.md is not ignored' \\}; git status --short --untracked-files=all$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

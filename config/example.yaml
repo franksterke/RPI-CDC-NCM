@@ -1,0 +1,31 @@
+# Example only. Replace every identity value before deployment.
+# The example VID/PID are unsuitable for production use.
+usb:
+  gadget_name: generic-ncm
+  udc: auto
+  vid: 0x1d6b
+  pid: 0x0104
+  manufacturer: Example Manufacturer
+  product: Example CDC-NCM Network
+  serial: DEV-00000001
+  language: 0x409
+  configuration: CDC-NCM
+  max_power_ma: 250
+  ncm:
+    qmult: 5
+    max_segment_size: 1514
+
+network:
+  # Locally administered, unicast, stable per physical unit.
+  device_mac: 02:00:00:00:00:01
+  host_mac: 02:00:00:00:00:02
+  subnet: 192.0.2.0/30
+  device_address: 192.0.2.1
+  dhcp:
+    # server is the zero-touch Windows default; disabled selects static host setup.
+    mode: server
+    host_address: 192.0.2.2
+    lease_seconds: 3600
+  ipv6:
+    # disabled or link-local
+    mode: disabled
