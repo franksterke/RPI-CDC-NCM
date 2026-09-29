@@ -39,7 +39,8 @@ set -euo pipefail
 # ------------------------------------------------------------
 
 USER_NAME="${SUDO_USER:-$(id -un)}"
-DEVICE_HOSTNAME="${DEVICE_HOSTNAME:-quadra-004}"
+# Read the existing hostname for connection instructions; never rename the device.
+DEVICE_HOSTNAME="$(hostname)"
 AP_ENABLED="${AP_ENABLED:-1}"
 AP_SSID="${AP_SSID:-Q004}"
 AP_PASSWORD="${AP_PASSWORD:-Capture!}"
@@ -154,12 +155,6 @@ ensure_capture_packages
 # ------------------------------------------------------------
 
 USB_GADGET_AVAILABLE=0
-
-# The runtime reads the hostname for its USB product string at boot.
-if command -v hostnamectl >/dev/null 2>&1; then
-    echo "Setting device hostname to ${DEVICE_HOSTNAME}..."
-    sudo hostnamectl set-hostname "$DEVICE_HOSTNAME"
-fi
 
 if is_enabled "$USB_GADGET_ENABLED"; then
     USB_SHARED_HOST="$(python3 -c 'import ipaddress, sys; n = ipaddress.IPv4Network(sys.argv[1]); print(n.network_address + 1)' "$USB_SUBNET")"

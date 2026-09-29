@@ -69,8 +69,8 @@ preferred. DHCP does not synchronize the board's clock.
 ### Optional USB drive alongside networking
 
 Use `--gadget ncm-storage` to expose both CDC-NCM and a read-only FAT USB drive
-labelled `QUADRA` on the same cable. The drive contains `START-HERE.html` from
-this checkout. Open it manually in the browser and enter the Quadra number;
+labelled with the hostname (uppercase, up to 11 characters, e.g. `QUADRA-002`) on the same cable. The drive contains `START-HERE.html` from
+this checkout, styled to match Capture. At startup the page is personalized with the hostname and device number. Open it manually and click **Open Capture**;
 the page uses `.local` name resolution, which requires mDNS on the board/host.
 The AP installer supplies the board's mDNS service; the core installer does not.
 
@@ -142,8 +142,9 @@ The old package remains installed but inactive; do not run `rpi-usb-gadget on`
 after migration. The clean `install_ap.sh` still rejects that package. The former
 `USB_SHARED_ADDRESS` override is replaced by `USB_SUBNET`, a private /30 network.
 `USB_GADGET_ENABLED=0` skips USB setup without uninstalling an existing gadget.
-`AP_ENABLED=0` skips AP setup. The default hostname and SSID are `quadra-004` and
-`Q004`; override them with `DEVICE_HOSTNAME` and `AP_SSID` as needed.
+`AP_ENABLED=0` skips AP setup. Both installers preserve the device's existing
+hostname; `DEVICE_HOSTNAME` is no longer an override. The default SSID is `Q004`;
+override it with `AP_SSID` as needed.
 
 ### Update and uninstall
 

@@ -3,15 +3,33 @@ import importlib.util
 from pathlib import Path
 import unittest
 import tempfile
+import sys
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 spec = importlib.util.spec_from_file_location('legacy', Path(__file__).resolve().parents[1] / 'tools/migrate-legacy.py')
 legacy = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(legacy)
 
 
 class LegacyTests(unittest.TestCase):
+    def test_cm5_host_overlay_preserved_through_installer_check(self):
+        original = ('[cm4]\notg_mode=1\n[cm5]\ndtoverlay=dwc2,dr_mode=host\n'
+                    '[all]\ndtoverlay=dwc2,dr_mode=peripheral\n')
+        updated = legacy.boot_contents(original, 'rpi-zero')
+        self.assertEqual(updated, original.replace(legacy.OVERLAY + '\n', ''))
+        self.assertEqual(list(legacy.zero_dwc2_overlays(updated)), [])
+
+    def test_all_resets_model_filter(self):
+        with self.assertRaisesRegex(ValueError, 'line 4'):
+            legacy.boot_contents('[cm5]\ndtoverlay=dwc2,dr_mode=host\n'
+                                 '[all]\ndtoverlay=dwc2,dr_mode=host\n', 'rpi-zero')
+
+    def test_other_filters_do_not_reset_model(self):
+        original = '[cm5]\n[gpio4=1]\ndtoverlay=dwc2,dr_mode=host\n'
+        self.assertEqual(legacy.boot_contents(original, 'rpi-zero'), original)
+
     def test_zero_replaces_only_known_overlay(self):
         original = '[all]\ndtoverlay=dwc2,dr_mode=peripheral\ndtparam=audio=on\n'
         self.assertEqual(legacy.boot_contents(original, 'rpi-zero'), '[all]\ndtparam=audio=on\n')

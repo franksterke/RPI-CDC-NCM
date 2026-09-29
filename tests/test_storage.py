@@ -10,19 +10,31 @@ from test_installer import gadget
 
 
 class StorageTests(unittest.TestCase):
+    def test_storage_hostname_and_label(self):
+        self.assertEqual(gadget.storage_identity('quadra-002'), ('quadra-002', 'QUADRA-002'))
+        self.assertEqual(gadget.storage_identity('quadra-002.local'), ('quadra-002', 'QUADRA-002'))
+        self.assertEqual(gadget.storage_identity('long-device-name')[1], 'LONG-DEVICE')
+        with self.assertRaises(ValueError):
+            gadget.storage_identity('bad</script>')
+
     def test_image_build_and_failure_cleanup(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             html = root / 'START-HERE.html'
-            html.write_text('<html>Quadra</html>')
+            html.write_text('<script>const deviceHostname = null /* QUADRA_HOSTNAME */;</script>')
             runtime = root / 'run'
+            def inspect_copy(args, **kwargs):
+                if args[0] == 'mcopy':
+                    self.assertIn('"quadra-002"', Path(args[3]).read_text())
+                    self.assertNotIn('QUADRA_HOSTNAME', Path(args[3]).read_text())
             with patch.object(gadget, 'HTML', html), patch.object(gadget, 'RUNTIME', runtime), \
+                 patch.object(gadget.socket, 'gethostname', return_value='quadra-002'), \
                  patch.object(gadget.shutil, 'which', return_value='/usr/bin/tool'), \
-                 patch.object(gadget.subprocess, 'run') as command:
+                 patch.object(gadget.subprocess, 'run', side_effect=inspect_copy) as command:
                 image = gadget.prepare_storage()
                 self.assertEqual(image.stat().st_size, 32 * 1024 * 1024)
-                self.assertEqual(command.call_args_list[1].args[0],
-                                 ['mcopy', '-i', str(image), str(html), '::START-HERE.html'])
+                self.assertEqual(command.call_args_list[0].args[0],
+                                 ['mkfs.vfat', '-F', '16', '-n', 'QUADRA-002', str(image)])
                 image.unlink()
                 command.side_effect = subprocess.CalledProcessError(1, 'mkfs.vfat')
                 with self.assertRaises(subprocess.CalledProcessError):

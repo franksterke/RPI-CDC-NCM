@@ -1,0 +1,38 @@
+QUADRA USB HELPERS
+
+SYNC-TIME.cmd / SYNC-TIME.ps1
+- Uses the Windows clock over SSH. No internet required.
+- Requires Windows OpenSSH, a trusted Pi host key, SSH key login and passwordless
+  sudo on the Pi. It does not disable SSH host verification or install keys.
+- Run SYNC-TIME.cmd, enter your Pi username, and leave it waiting (up to 3 minutes).
+- For reliable boot timing, copy BOTH files to your PC first and start the helper
+  before powering on the Pi. Nothing on this USB drive runs automatically.
+- The Pi accepts time only in a 5-second window BEFORE Capture initialization.
+  No response: Capture starts normally with its current clock.
+- After the window closes, all requests are refused until the next Pi reboot.
+  This helper never stops logging or changes time mid-recording.
+- This is approximate PC clock synchronization, not precision measurement timing.
+- If Windows policy blocks PowerShell scripts, follow your organization's script
+  approval process. These helpers do not bypass execution policy.
+
+SHARE-INTERNET.ps1 (optional)
+- Open Windows PowerShell as Administrator and run this script by its full path.
+- Select your internet adapter and the Quadra USB adapter by their exact names.
+- Requires working SSH/sudo and the installed Capture time guard.
+- Type SHARE to enable Windows ICS and set the Pi to DHCP for its next boot.
+- The current USB connection will drop. The script DOES NOT reboot the Pi or
+  restart Capture. Finish logging before rebooting the Pi manually.
+- On next boot, Windows supplies the USB address. Use the hostname .local link.
+- If the PC has no internet, neither will the Pi. ICS must be enabled on each PC.
+- To return to standalone USB, disable sharing in Windows and use Wi-Fi/console:
+  cd ~/RPI-CDC-NCM
+  sudo python3 tools/install.py install --board rpi-zero --development --gadget ncm-storage --network server
+  Reboot when logging has stopped. The server-mode USB address is 192.168.7.1.
+
+INSTALL THE PI TIME GUARD (once, from the checkout)
+  sudo bash tools/install-time-sync.sh
+This disables known background NTP services and adds a Capture ExecStartPre gate.
+It does not change the clock or restart Capture. It takes effect at next start.
+The prior NTP service enabled/active states are saved under /var/lib/quadra-time-sync.
+Removing capture.service.d/20-quadra-time-sync.conf and reloading systemd removes
+this gate. Restore NTP services only if automatic clock changes are wanted again.

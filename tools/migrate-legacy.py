@@ -12,6 +12,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+from boot_config import zero_dwc2_overlays
 
 BASE = Path('/var/lib/usb-cdc-ncm')
 SERVICE = 'rpi-usb-gadget-ics.service'
@@ -53,10 +54,12 @@ def boot_contents(text, board):
     if board != 'rpi-zero':
         return text  # generic depends on the vendor's existing peripheral setup
     lines = text.splitlines(keepends=True)
-    overlays = [line.strip() for line in lines if line.strip().startswith('dtoverlay=dwc2')]
-    if any(line != OVERLAY for line in overlays):
-        raise ValueError('Nonstandard dwc2 overlay; reconcile it before migration')
-    return ''.join(line for line in lines if line.strip() != OVERLAY)
+    overlays = dict(zero_dwc2_overlays(text))
+    for index, directive in overlays.items():
+        if directive != OVERLAY:
+            raise ValueError(f'Nonstandard dwc2 overlay on line {index + 1}: {directive}; '
+                             'reconcile it before migration')
+    return ''.join(line for index, line in enumerate(lines) if index not in overlays)
 
 
 def migrate(install, args):

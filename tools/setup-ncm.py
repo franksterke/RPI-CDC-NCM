@@ -17,6 +17,13 @@ HTML = Path('/usr/local/share/usb-cdc-ncm/START-HERE.html')
 RUNTIME = Path('/run/usb-cdc-ncm')
 
 
+def storage_identity(hostname):
+    hostname = hostname.split('.', 1)[0].lower()
+    if not re.fullmatch(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?', hostname):
+        raise ValueError('Invalid device hostname')
+    return hostname, hostname.upper()[:11]
+
+
 def prepare_storage():
     """Build a fresh image without touching storage exported by a running gadget."""
     for command in ('mkfs.vfat', 'mcopy'):
@@ -24,13 +31,26 @@ def prepare_storage():
             raise ValueError('USB storage requires dosfstools and mtools: missing ' + command)
     if not HTML.is_file():
         raise ValueError('Missing USB landing page: ' + str(HTML))
+    hostname, label = storage_identity(socket.gethostname())
+    page = HTML.read_text(encoding='utf-8').replace(
+        'null /* QUADRA_HOSTNAME */', json.dumps(hostname))
     RUNTIME.mkdir(mode=0o700, parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(dir=RUNTIME, suffix='.img', delete=False) as image:
         image.truncate(32 * 1024 * 1024)
         path = Path(image.name)
     try:
-        subprocess.run(['mkfs.vfat', '-F', '16', '-n', 'QUADRA', str(path)], check=True)
-        subprocess.run(['mcopy', '-i', str(path), str(HTML), '::START-HERE.html'], check=True)
+        subprocess.run(['mkfs.vfat', '-F', '16', '-n', label, str(path)], check=True)
+        with tempfile.TemporaryDirectory(dir=RUNTIME) as directory:
+            landing = Path(directory) / 'START-HERE.html'
+            landing.write_text(page, encoding='utf-8')
+            subprocess.run(['mcopy', '-i', str(path), str(landing), '::START-HERE.html'], check=True)
+            for name in ('SYNC-TIME.ps1', 'SYNC-TIME.cmd', 'SHARE-INTERNET.ps1', 'HELPERS.txt'):
+                source = HTML.with_name(name)
+                if source.is_file():
+                    helper = Path(directory) / name
+                    helper.write_text(source.read_text(encoding='utf-8-sig').replace(
+                        '__QUADRA_HOSTNAME__', hostname), encoding='utf-8', newline='\r\n')
+                    subprocess.run(['mcopy', '-i', str(path), str(helper), '::' + name], check=True)
         return path
     except Exception:
         path.unlink(missing_ok=True)

@@ -8,6 +8,7 @@ from pathlib import Path
 import secrets
 import subprocess
 import shutil
+from boot_config import zero_dwc2_overlays
 
 STATE = Path('/var/lib/usb-cdc-ncm/install.json')
 IDENTITY = '/etc/usb-cdc-ncm.json'
@@ -154,10 +155,13 @@ WantedBy=multi-user.target
     if mode == 'ncm-storage':
         files['/usr/local/share/usb-cdc-ncm/START-HERE.html'] = (
             Path(__file__).resolve().parents[1] / 'START-HERE.html').read_text(encoding='utf-8')
+        for name in ('SYNC-TIME.ps1', 'SYNC-TIME.cmd', 'SHARE-INTERNET.ps1', 'HELPERS.txt'):
+            files['/usr/local/share/usb-cdc-ncm/' + name] = (
+                Path(__file__).resolve().parents[1] / 'usb' / name).read_text(encoding='utf-8-sig')
     if boot:
         original = boot.read_text()
         overlay = 'dtoverlay=dwc2,dr_mode=peripheral'
-        if any(line.strip().startswith('dtoverlay=dwc2') for line in original.splitlines()) and not state:
+        if any(zero_dwc2_overlays(original)) and not state:
             raise ValueError('Existing dwc2 overlay: use generic after enabling the UDC, or reconcile boot configuration first')
         files[str(boot)] = original if state else original + '\n# usb-cdc-ncm installer\n[all]\n' + overlay + '\n'
     for name in files:
