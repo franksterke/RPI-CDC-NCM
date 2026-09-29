@@ -94,6 +94,8 @@ class LegacyTests(unittest.TestCase):
 
     def test_non_usb_profile_is_rejected(self):
         def command(*args):
+            if '--escape' in args:
+                return 'wifi-uuid:/unused'
             if args[2] == 'UUID':
                 return 'wifi-uuid'
             return {'connection.id': 'USB Gadget (shared)',
@@ -101,6 +103,33 @@ class LegacyTests(unittest.TestCase):
                     'connection.interface-name': 'wlan0'}[args[2]]
         with patch.object(legacy, 'run', side_effect=command):
             with self.assertRaisesRegex(ValueError, 'nonstandard legacy profile'):
+                legacy.profiles()
+
+    def test_profile_filename_uses_list_column(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = Path(directory) / 'USB Gadget shared.nmconnection'
+            profile.write_text('[connection]\nuuid=usb-uuid\n')
+
+            def command(*args):
+                if args == ('nmcli', '--escape', 'no', '-t', '-f', 'UUID,FILENAME', 'connection', 'show'):
+                    return f'usb-uuid:{profile}\n'
+                self.assertNotIn('GENERAL.FILENAME', args)
+                return {'UUID': 'usb-uuid', 'connection.id': 'USB Gadget (shared)',
+                        'connection.type': '802-3-ethernet',
+                        'connection.interface-name': 'usb0'}[args[2]]
+
+            with patch.object(legacy, 'run', side_effect=command):
+                self.assertEqual(legacy.profiles(), [('usb-uuid', profile)])
+
+    def test_missing_profile_file_fails_before_migration(self):
+        def command(*args):
+            if '--escape' in args:
+                return 'usb-uuid:'
+            return {'UUID': 'usb-uuid', 'connection.id': 'USB Gadget (client)',
+                    'connection.type': '802-3-ethernet',
+                    'connection.interface-name': 'usb0'}[args[2]]
+        with patch.object(legacy, 'run', side_effect=command):
+            with self.assertRaisesRegex(ValueError, 'Cannot back up legacy profile'):
                 legacy.profiles()
 
 

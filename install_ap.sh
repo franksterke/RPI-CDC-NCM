@@ -25,6 +25,7 @@ set -euo pipefail
 #   USB_GADGET_ENABLED=0 ./install_ap.sh
 #   USB_BOARD=generic ./install_ap.sh
 #   USB_NETWORK=client ./install_ap.sh
+#   USB_GADGET_MODE=ncm-storage ./install_ap.sh
 #   USB_SUBNET=192.168.8.0/30 ./install_ap.sh
 #
 # Requires a full checkout, including tools/install.py and tools/setup-ncm.py.
@@ -48,6 +49,7 @@ START_AP_NOW="${START_AP_NOW:-0}"
 USB_GADGET_ENABLED="${USB_GADGET_ENABLED:-1}"
 USB_BOARD="${USB_BOARD:-rpi-zero}"
 USB_NETWORK="${USB_NETWORK:-server}"
+USB_GADGET_MODE="${USB_GADGET_MODE:-ncm}"
 USB_SUBNET="${USB_SUBNET:-192.168.7.0/30}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 USB_SHARED_HOST=""
@@ -95,6 +97,10 @@ fi
 
 validate_usb_settings() {
     is_enabled "$USB_GADGET_ENABLED" || return 0
+    case "$USB_GADGET_MODE" in
+        ncm|ncm-storage) ;;
+        *) echo "ERROR: USB_GADGET_MODE must be ncm or ncm-storage."; exit 1 ;;
+    esac
     case "$USB_BOARD" in
         rpi-zero|generic) ;;
         *) echo "ERROR: USB_BOARD must be rpi-zero or generic."; exit 1 ;;
@@ -140,15 +146,8 @@ echo "=================================================="
 echo ""
 echo "Installing required packages..."
 
-sudo apt update
-sudo apt install -y \
-    avahi-daemon \
-    network-manager \
-    nginx \
-    openssh-server \
-    python3 \
-    iproute2 \
-    kmod
+source "$SCRIPT_DIR/tools/install-packages.sh"
+ensure_capture_packages
 
 # ------------------------------------------------------------
 # INSTALL USB CDC-NCM
@@ -166,7 +165,7 @@ if is_enabled "$USB_GADGET_ENABLED"; then
     USB_SHARED_HOST="$(python3 -c 'import ipaddress, sys; n = ipaddress.IPv4Network(sys.argv[1]); print(n.network_address + 1)' "$USB_SUBNET")"
     echo "Installing USB CDC-NCM ($USB_NETWORK mode, development USB identity)..."
     sudo python3 "$SCRIPT_DIR/tools/install.py" install \
-        --board "$USB_BOARD" --network "$USB_NETWORK" --subnet "$USB_SUBNET" \
+        --board "$USB_BOARD" --network "$USB_NETWORK" --subnet "$USB_SUBNET" --gadget "$USB_GADGET_MODE" \
         --development
     USB_GADGET_AVAILABLE=1
 else

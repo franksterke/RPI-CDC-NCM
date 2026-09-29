@@ -74,7 +74,7 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual(existing.read_text(), 'original')
             self.assertFalse(created.exists())
 
-    def lifecycle(self, fail=False):
+    def lifecycle(self, fail=False, storage=False):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             def target(value):
@@ -86,19 +86,20 @@ class InstallerTests(unittest.TestCase):
             target('/etc/dummy').parent.mkdir()
             state = target('/var/lib/usb-cdc-ncm/install.json')
             args = SimpleNamespace(board='generic', network='server', subnet='192.168.7.0/30',
-                                   development=True, dry_run=False)
+                                   development=True, dry_run=False, gadget='ncm-storage' if storage else 'ncm')
             def command(*argv):
                 if fail and argv[:2] == ('systemctl', 'enable'):
                     raise subprocess.CalledProcessError(1, argv)
                 return '[]' if argv[0] == 'ip' else ''
             with patch.object(installer, 'Path', side_effect=target), patch.object(installer, 'STATE', state), \
                  patch.object(installer, 'run', side_effect=command), patch.object(installer, 'enabled', return_value=False), \
-                 patch.object(installer.subprocess, 'run'):
+                 patch.object(installer.subprocess, 'run'), patch.object(installer.shutil, 'which', return_value='/usr/bin/tool'):
                 if fail:
                     with self.assertRaises(subprocess.CalledProcessError):
                         installer.install(args)
                     self.assertFalse(state.exists())
                     self.assertFalse(target('/usr/local/sbin/usb-cdc-ncm').exists())
+                    self.assertFalse(target('/usr/local/share/usb-cdc-ncm/START-HERE.html').exists())
                     return
                 args.dry_run = True
                 installer.install(args)
@@ -107,13 +108,21 @@ class InstallerTests(unittest.TestCase):
                 args.dry_run = False
                 installer.install(args)
                 identity = target(installer.IDENTITY).read_text()
+                if storage:
+                    self.assertEqual(target('/usr/local/share/usb-cdc-ncm/START-HERE.html').read_text(),
+                                     (ROOT / 'START-HERE.html').read_text(encoding='utf-8'))
+                    self.assertIn('ncm-storage', target('/etc/usb-cdc-ncm-gadget.json').read_text())
+                    # An update changes the mode without changing persistent identity.
+                    args.gadget = 'ncm'
                 args.network = 'client'
                 installer.install(args)
                 self.assertEqual(target(installer.IDENTITY).read_text(), identity)
                 self.assertIn('DHCP=ipv4', target('/etc/systemd/network/10-usb-cdc-ncm.network').read_text())
+                self.assertNotIn('ncm-storage', target('/etc/usb-cdc-ncm-gadget.json').read_text())
                 installer.uninstall(args)
                 self.assertFalse(state.exists())
                 self.assertFalse(target('/usr/local/sbin/usb-cdc-ncm').exists())
+                self.assertFalse(target('/usr/local/share/usb-cdc-ncm/START-HERE.html').exists())
                 self.assertEqual(target(installer.IDENTITY).read_text(), identity)
 
     def test_install_update_uninstall(self):
@@ -121,6 +130,12 @@ class InstallerTests(unittest.TestCase):
 
     def test_failed_install_rolls_back(self):
         self.lifecycle(fail=True)
+
+    def test_composite_install_switch_uninstall(self):
+        self.lifecycle(storage=True)
+
+    def test_failed_composite_install_rolls_back(self):
+        self.lifecycle(fail=True, storage=True)
 
 
 if __name__ == '__main__':

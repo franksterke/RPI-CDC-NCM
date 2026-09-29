@@ -18,7 +18,11 @@ additional board profiles and Linux/macOS host qualification remain pending.
 
 This repository will provide a reusable Linux device-side USB networking component. It will compose a USB gadget with ConfigFS/libcomposite and the kernel CDC-NCM function, configure the resulting Linux network link, integrate with systemd, and provide diagnostics. It will not contain product identity, board-specific paths, or Windows kernel drivers.
 
-The default gadget is a single USB configuration containing one `ncm` function. RNDIS is a documented, explicitly selected legacy fallback only; it is not part of the default descriptor set.
+The default gadget is a single USB configuration containing one `ncm` function.
+The optional `--gadget ncm-storage` mode adds a read-only `mass_storage` function
+to that same configuration. Its FAT image contains `START-HERE.html`; the backing
+image is generated before attachment and replaced only after gadget teardown.
+Composite host/controller qualification is pending. RNDIS is not implemented.
 
 ## Target data path
 

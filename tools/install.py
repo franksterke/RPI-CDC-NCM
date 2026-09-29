@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import secrets
 import subprocess
+import shutil
 
 STATE = Path('/var/lib/usb-cdc-ncm/install.json')
 IDENTITY = '/etc/usb-cdc-ncm.json'
@@ -95,6 +96,14 @@ def install(args):
     run('systemctl', 'cat', 'systemd-networkd.service')
     run('modprobe', '--dry-run', 'libcomposite')
     run('modprobe', '--dry-run', 'usb_f_ncm')
+    mode = getattr(args, 'gadget', 'ncm')
+    if mode not in ('ncm', 'ncm-storage'):
+        raise ValueError('Invalid USB gadget mode')
+    if mode == 'ncm-storage':
+        run('modprobe', '--dry-run', 'usb_f_mass_storage')
+        for command in ('mkfs.vfat', 'mcopy'):
+            if not shutil.which(command):
+                raise ValueError('Install dosfstools and mtools for USB storage; missing ' + command)
     state = json.loads(STATE.read_text()) if STATE.exists() else None
     if state:
         check_unchanged(state)
@@ -118,6 +127,7 @@ def install(args):
     spec.loader.exec_module(gadget)
     gadget.validate(identity)
     files = {
+        '/etc/usb-cdc-ncm-gadget.json': json.dumps({'mode': mode}) + '\n',
         '/usr/local/sbin/usb-cdc-ncm': Path(__file__).with_name('setup-ncm.py').read_text(),
         '/etc/systemd/network/10-usb-cdc-ncm.network': network_config(identity['device_mac'], args.network, args.subnet),
         '/etc/NetworkManager/conf.d/90-usb-cdc-ncm.conf':
@@ -131,6 +141,8 @@ Before=systemd-networkd.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+RuntimeDirectory=usb-cdc-ncm
+RuntimeDirectoryMode=0700
 ExecStart=/usr/local/sbin/usb-cdc-ncm start
 ExecStop=/usr/local/sbin/usb-cdc-ncm stop
 TimeoutStartSec=45
@@ -139,6 +151,9 @@ TimeoutStartSec=45
 WantedBy=multi-user.target
 ''',
     }
+    if mode == 'ncm-storage':
+        files['/usr/local/share/usb-cdc-ncm/START-HERE.html'] = (
+            Path(__file__).resolve().parents[1] / 'START-HERE.html').read_text(encoding='utf-8')
     if boot:
         original = boot.read_text()
         overlay = 'dtoverlay=dwc2,dr_mode=peripheral'
@@ -156,7 +171,7 @@ WantedBy=multi-user.target
                 continue
             if wanted.overlaps(ipaddress.IPv4Network(dst, strict=False)) and not (state and route.get('dev') in gadget_interfaces(identity)):
                 raise ValueError(f'Subnet overlaps an existing route: {dst}')
-    print(f'Board: {args.board}; networking: {args.network}; model: {model}')
+    print(f'Board: {args.board}; gadget: {mode}; networking: {args.network}; model: {model}')
     print('\n'.join(files))
     if args.dry_run:
         print('Preflight passed; no changes made.')
@@ -238,6 +253,8 @@ def main():
     parser.add_argument('action', choices=['install', 'uninstall'])
     parser.add_argument('--board', choices=['rpi-zero', 'generic'], default='generic')
     parser.add_argument('--network', choices=['server', 'client'], default='server')
+    parser.add_argument('--gadget', choices=['ncm', 'ncm-storage'], default='ncm',
+                        help='Optionally expose a read-only USB drive containing START-HERE.html')
     parser.add_argument('--subnet', default='192.168.7.0/30')
     parser.add_argument('--development', action='store_true')
     parser.add_argument('--dry-run', action='store_true')

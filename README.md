@@ -1,6 +1,7 @@
 # USB CDC-NCM installer
 
-Install a single-function USB network gadget on a systemd Linux board. The board
+Install a USB network gadget, optionally with a simultaneous read-only USB drive,
+on a systemd Linux board. The board
 advertises its hostname as its USB product name and retains its serial and MAC
 addresses across reboot and reinstall. No Python packages are required.
 
@@ -65,10 +66,47 @@ systemd-resolved); this installer does not replace `/etc/resolv.conf`.
 The USB route metric is 700, so an existing Wi-Fi route with metric 600 stays
 preferred. DHCP does not synchronize the board's clock.
 
+### Optional USB drive alongside networking
+
+Use `--gadget ncm-storage` to expose both CDC-NCM and a read-only FAT USB drive
+labelled `QUADRA` on the same cable. The drive contains `START-HERE.html` from
+this checkout. Open it manually in the browser and enter the Quadra number;
+the page uses `.local` name resolution, which requires mDNS on the board/host.
+The AP installer supplies the board's mDNS service; the core installer does not.
+
+```sh
+sudo apt-get install dosfstools mtools
+sudo python3 tools/install.py install --board rpi-zero --development --gadget ncm-storage
+sudo reboot
+```
+
+For the full application setup or legacy migration, use
+`USB_GADGET_MODE=ncm-storage bash install_ap.sh` or
+`USB_GADGET_MODE=ncm-storage bash install_legacy.sh`. These wrappers install
+the extra image tools when needed. The default remains `ncm` (networking only).
+Rerun with `--gadget ncm` (or `USB_GADGET_MODE=ncm`) and reboot to remove the drive.
+
+The installed page is tracked for update/uninstall. To change it, edit the checkout
+and rerun installation. A fresh 32 MiB image is generated under `/run/usb-cdc-ncm`
+at service startup, then attached only after the previous gadget is unbound.
+No SD-card partition or writable board filesystem is exported. Restarting the
+gadget disconnects both functions; use Wi-Fi/console access for that operation.
+If the host ejects the media, restart the gadget or reboot to load it again.
+
+Composite mode requires kernel `usb_f_mass_storage` support and enough controller
+endpoints. Pi/Windows composite enumeration, read-only drive access, simultaneous
+SSH/web access, reconnect and reboot still require hardware qualification.
+Windows may create a new adapter when the function layout changes.
+
 ### Capture AP and web proxy setup
 
 For the application setup (SSH, mDNS, nginx on port 80 forwarding to port 8080,
 and the optional Wi-Fi fallback AP), run from a full checkout on the board:
+
+Both shell installers skip apt entirely when all required packages are already
+installed. If packages are missing, they refresh package indexes and install only
+those packages; this requires working repository access. The legacy installer
+checks all application dependencies before changing USB settings.
 
 ```sh
 bash install_ap.sh

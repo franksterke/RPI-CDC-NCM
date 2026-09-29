@@ -28,6 +28,11 @@ def run(*args):
 
 def profiles():
     result = []
+    # FILENAME is a connection-list column, not a GENERAL detail property.
+    # Disable escaping and split once: filenames can contain colons/backslashes.
+    filenames = dict(line.split(':', 1) for line in
+                     run('nmcli', '--escape', 'no', '-t', '-f', 'UUID,FILENAME',
+                         'connection', 'show').splitlines() if ':' in line)
     for uuid in run('nmcli', '-g', 'UUID', 'connection', 'show').splitlines():
         name = run('nmcli', '-g', 'connection.id', 'connection', 'show', 'uuid', uuid)
         if name not in NAMES:
@@ -36,7 +41,7 @@ def profiles():
         iface = run('nmcli', '-g', 'connection.interface-name', 'connection', 'show', 'uuid', uuid)
         if kind != '802-3-ethernet' or iface != 'usb0':
             raise ValueError(f'Refusing to migrate nonstandard legacy profile {uuid}: {kind}, {iface}')
-        filename = run('nmcli', '-g', 'GENERAL.FILENAME', 'connection', 'show', 'uuid', uuid)
+        filename = filenames.get(uuid, '')
         path = Path(filename)
         if not path.is_absolute() or not path.is_file() or path.is_symlink():
             raise ValueError(f'Cannot back up legacy profile {uuid}: {filename}')
@@ -135,6 +140,7 @@ def main():
     parser.add_argument('--board', choices=['rpi-zero', 'generic'], required=True)
     parser.add_argument('--network', choices=['server', 'client'], required=True)
     parser.add_argument('--subnet', required=True)
+    parser.add_argument('--gadget', choices=['ncm', 'ncm-storage'], default='ncm')
     args = parser.parse_args()
     args.development, args.dry_run = True, False
     try:

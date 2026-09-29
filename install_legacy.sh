@@ -18,12 +18,14 @@ if [ -n "${USB_SHARED_ADDRESS:-}" ]; then
     exit 1
 fi
 
-sudo apt update
-sudo apt install -y python3 iproute2 kmod network-manager
+# Check the complete setup's dependencies before changing legacy USB settings.
+source "$SCRIPT_DIR/tools/install-packages.sh"
+ensure_capture_packages
 sudo python3 "$SCRIPT_DIR/tools/migrate-legacy.py" \
     --board "${USB_BOARD:-rpi-zero}" \
     --network "${USB_NETWORK:-server}" \
-    --subnet "${USB_SUBNET:-192.168.7.0/30}"
+    --subnet "${USB_SUBNET:-192.168.7.0/30}" \
+    --gadget "${USB_GADGET_MODE:-ncm}"
 
 # NCM is already installed; this avoids the clean installer's legacy-package guard.
 USB_GADGET_ENABLED=0 bash "$SCRIPT_DIR/install_ap.sh"
